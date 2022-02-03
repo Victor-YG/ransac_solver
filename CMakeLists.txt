@@ -39,5 +39,3 @@ include_directories(./examples)
 add_executable(calc_essential_matrix ./examples/calc_essential_matrix.cpp ./examples/reconstruction.cpp)
 target_link_libraries(calc_essential_matrix ${OpenCV_LIBS} gflags)
 
-add_executable(test ./examples/test.cpp)
-

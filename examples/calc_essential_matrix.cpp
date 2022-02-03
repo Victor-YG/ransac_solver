@@ -49,8 +49,6 @@ int main(int argc, char** argv)
 
     std::string img_path_1 = FLAGS_img_1;
     std::string img_path_2 = FLAGS_img_2;
-    // std::string img_path_1 = "./../examples/data/1403636630363555584.png";
-    // std::string img_path_2 = "./../examples/data/1403636631163555584.png";
 
     cv::Mat img_1 = cv::imread(img_path_1, cv::IMREAD_GRAYSCALE);
     cv::Mat img_2 = cv::imread(img_path_2, cv::IMREAD_GRAYSCALE);
@@ -96,7 +94,7 @@ int main(int argc, char** argv)
         float d1 = matched_feature_list[i][0].distance;
         float d2 = matched_feature_list[i][1].distance;
 
-        if (d1 < dist_thres && d1 / d2 < 0.5)
+        if (d1 < dist_thres && d1 / d2 < ratio_thres)
         {
             final_matches.emplace_back(matched_feature_list[i][0]);
         }
@@ -112,8 +110,6 @@ int main(int argc, char** argv)
     // ***************************
     // load camera parameters
     std::string cam_file_path = FLAGS_camera;
-    // std::string cam_file_path = "./../examples/data/example_camera.txt";
-
     float fx, fy, cx, cy, k1, k2, p1, p2, k3;
     LoadCameraParams(cam_file_path, fx, fy, cx, cy, k1, k2, p1, p2, k3);
     cv::Mat_<float> cam_matrix(3, 3);

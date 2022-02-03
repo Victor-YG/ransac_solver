@@ -17,14 +17,14 @@ typedef std::pair<cv::Point2f, cv::Point2f> PointPair;
 class EssentialMatrix : public RANSAC::Model<PointPair, cv::Mat>
 {
 public:
-    // EssentialMatrix(): RANSAC::Model<PointPair, cv::Mat>() {};
-
     unsigned int NumElementsRequired() override
     {
         return 8; // eight point algorithm
     };
 
-    cv::Mat Fit(std::vector<PointPair> elements) override
+    cv::Mat Fit(
+        const std::vector<PointPair>& elements, 
+        const std::vector<float>& weights) override
     {
         unsigned int N = elements.size();
         cv::Mat A(N, 9, CV_32F);

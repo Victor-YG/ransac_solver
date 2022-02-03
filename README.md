@@ -20,16 +20,15 @@ unsigned int NumElementsRequired() {}
 ```
 
 ```
-// how to fit the ModelParams given the list of selected elements
-ModelParams Fit(std::vector<Element> elements) {}
+// how to fit the ModelParams given the list of selected elements and weights
+ModelParams Fit(const std::vector<Element>& elements, const std::vector<float>& weights) {}
 ```
 
 ```
 // judge whether the input element is inlier or outlier.
-bool IsInlier(const Element& element, float& score) {}
-// you can also return a score used in the solver for judging how good the parameter fits the list of elements. If judging by counting inlier, simply set 1 for inlier and 0 for outlier.
-// only score of inlier will be added to total score.
-// if using loss metric, set score to be the negative of the loss.
+bool IsInlier(const Element& element, float& loss) {}
+// you can also return a loss used in the solver for judging how good the parameter fits the list of elements. If judging by counting inlier, simply set 0 for inlier and 1 for outlier.
+// only loss of inlier will be added to total loss.
 ```
 
 4. In your main routine, 
@@ -40,6 +39,9 @@ bool IsInlier(const Element& element, float& score) {}
 YourModel model;
 RANSAC::Solver<YourElementType, YourParamsType> solver(&model, max_iteration);
 YourParamsType params = solver.Solve(vector_of_your_elements);
+
+// or
+YourParamsType params = solver.Solve(/*input*/ elements, weights, /*output*/ mask, losses);
 ```
 
 For a complete example, check the ./examples.

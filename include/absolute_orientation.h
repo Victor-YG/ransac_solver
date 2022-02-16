@@ -21,7 +21,7 @@ class PointSetTransModel : public RANSAC::Model<PointPair, Eigen::Matrix4f>
 public:
     unsigned int NumElementsRequired() override
     {
-        return 4;
+        return 3;
     };
 
     Eigen::Matrix4f Fit(
@@ -29,7 +29,10 @@ public:
         const std::vector<float>& weights) override
     {
         unsigned int N = elements.size();
-        
+
+        if (weights.size() == 0) std::vector<float> weights(N, 1.0);
+        assert(weights.size() == N);
+
         std::vector<Eigen::Vector3f> src;
         std::vector<Eigen::Vector3f> dst;
         src.reserve(N);
@@ -38,15 +41,18 @@ public:
         // compute centroids of point clouds
         Eigen::Vector3f src_c = Eigen::Vector3f::Zero();
         Eigen::Vector3f dst_c = Eigen::Vector3f::Zero();
+        float total_weight = 0.0;
 
         for (int i = 0; i < N; i++)
         {
-            src_c += elements[i].first;
-            dst_c += elements[i].second;
+            float weight = weights[i];
+            src_c += elements[i].first  * weight;
+            dst_c += elements[i].second * weight;
+            total_weight += weight;
         }
 
-        src_c /= N;
-        dst_c /= N;
+        src_c /= total_weight;
+        dst_c /= total_weight;
 
         // demean of point clouds
         for (int i = 0; i < N; i++)
@@ -60,15 +66,15 @@ public:
 
         for (int i = 0; i < N; i++)
         {
-            M(0, 0) += dst[i](0) * src[i](0);
-            M(0, 1) += dst[i](0) * src[i](1);
-            M(0, 2) += dst[i](0) * src[i](2);
-            M(1, 0) += dst[i](1) * src[i](0);
-            M(1, 1) += dst[i](1) * src[i](1);
-            M(1, 2) += dst[i](1) * src[i](2);
-            M(2, 0) += dst[i](2) * src[i](0);
-            M(2, 1) += dst[i](2) * src[i](1);
-            M(2, 2) += dst[i](2) * src[i](2);
+            M(0, 0) += dst[i](0) * src[i](0) * weights[i];
+            M(0, 1) += dst[i](0) * src[i](1) * weights[i];
+            M(0, 2) += dst[i](0) * src[i](2) * weights[i];
+            M(1, 0) += dst[i](1) * src[i](0) * weights[i];
+            M(1, 1) += dst[i](1) * src[i](1) * weights[i];
+            M(1, 2) += dst[i](1) * src[i](2) * weights[i];
+            M(2, 0) += dst[i](2) * src[i](0) * weights[i];
+            M(2, 1) += dst[i](2) * src[i](1) * weights[i];
+            M(2, 2) += dst[i](2) * src[i](2) * weights[i];
         }
 
         // svd

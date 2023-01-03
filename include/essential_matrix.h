@@ -22,8 +22,13 @@ public:
         return 8; // eight point algorithm
     };
 
+    virtual void SetModelParams(const cv::Mat& params) override
+    {
+        m_essential = params;
+    }
+
     cv::Mat Fit(
-        const std::vector<PointPair>& elements, 
+        const std::vector<PointPair>& elements,
         const std::vector<float>& weights) override
     {
         unsigned int N = elements.size();
@@ -63,7 +68,7 @@ public:
         std::cout << "[DEBUG]: EssentialMatrix::Fit(): E = " << std::endl;
         std::cout << E << std::endl;
         #endif
-        
+
         m_essential = E;
         return m_essential;
     }

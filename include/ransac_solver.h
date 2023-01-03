@@ -15,8 +15,10 @@ class Model
 public:
     virtual unsigned int NumElementsRequired() = 0;
 
+    virtual void SetModelParams(const ModelParams& params) = 0;
+
     virtual ModelParams Fit(
-        const std::vector<Element>& elements, 
+        const std::vector<Element>& elements,
         const std::vector<float>& weights) = 0;
 
     virtual bool IsInlier(const Element& element, float& loss) = 0;
@@ -31,25 +33,25 @@ public:
     Solver(Model<Element, ModelParams>* model_, int max_iteration_)
         : m_model(model_), m_max_iteration(max_iteration_) {};
 
-    ModelParams Solve(const std::vector<Element>& elements)
-    {
-        unsigned int N = elements.size();
-        std::vector<float> weights(N, 1.0);
-        std::vector<bool> labels(N, true);
-        std::vector<float> losses(N, 0.0);
+    // ModelParams Solve(const std::vector<Element>& elements)
+    // {
+    //     unsigned int N = elements.size();
+    //     std::vector<float> weights(N, 1.0);
+    //     std::vector<bool> labels(N, true);
+    //     std::vector<float> losses(N, 0.0);
 
-        return this->Solve(elements, weights, labels, losses);
-    }
+    //     return this->Solve(elements, weights, labels, losses);
+    // }
 
     ModelParams Solve(
-        const std::vector<Element>& elements, 
-        const std::vector<float>& weights, 
-        std::vector<bool>& labels, 
+        const std::vector<Element>& elements,
+        const std::vector<float>& weights,
+        std::vector<bool>& labels,
         std::vector<float>& losses)
     {
         labels.clear();
         losses.clear();
-        
+
         unsigned int size = elements.size();
         labels.reserve(size);
         losses.reserve(size);
@@ -58,6 +60,8 @@ public:
         std::vector<Element> elements_selected;
         std::vector<float> weights_selected;
         std::vector<bool> is_inlier_temp;
+        ModelParams params_temp;
+        ModelParams params_final;
         is_inlier_temp.resize(size);
 
         int best_count = -1;
@@ -79,8 +83,8 @@ public:
             }
 
             // fit model params
-            m_model->Fit(elements_selected, weights_selected);
-            
+            params_temp = m_model->Fit(elements_selected, weights_selected);
+
             // count inliers (vs. outliers)
             int count = 0;
             float total_loss = 0;
@@ -103,15 +107,17 @@ public:
             if (count > best_count)
             {
                 best_count = count;
+                params_final = params_temp;
+
                 for (int i = 0; i < size; i++)
                 {
                     is_inlier_final[i] = is_inlier_temp[i];
                 }
             }
 
-            // early termination when concensus found 
+            // early termination when concensus found
             // TODO::make this as an option
-            if (count > size * 0.8) break;
+            // if (count > size * 0.8) break;
         }
 
         // compute final params with inliers
@@ -126,18 +132,19 @@ public:
             }
         }
 
-        // final fitting
-        ModelParams final_params;
-        if (inliers.size() > num)
-        {
-            final_params = m_model->Fit(inliers, inlier_weights);
-        }
-        else // failed to reject outliers
-        {
-            final_params = m_model->Fit(elements, weights);
-        }
+        // // final fitting
+        // ModelParams params_final;
+        // if (inliers.size() > num)
+        // {
+        //     params_final = m_model->Fit(inliers, inlier_weights);
+        // }
+        // else // failed to reject outliers
+        // {
+        //     params_final = m_model->Fit(elements, weights);
+        // }
 
         // update inlier info and losses
+        m_model->SetModelParams(params_final);
         for (int i = 0; i < size; i++)
         {
             float loss = 0.0;
@@ -146,7 +153,7 @@ public:
             losses.emplace_back(loss);
         }
 
-        return final_params;
+        return params_final;
     };
 
 private:

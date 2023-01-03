@@ -2,19 +2,10 @@
 
 #include "ransac_solver.h"
 
-#include <vector>
-
 #include <Eigen/Geometry>
 
 
 typedef std::pair<Eigen::Vector3f, Eigen::Vector3f> PointPair;
-
-Eigen::Vector3f AveragePointCloud(std::vector<Eigen::Vector3f> points);
-
-Eigen::Matrix3f CrossCovariance(
-    std::vector<Eigen::Vector3f> src, 
-    std::vector<Eigen::Vector3f> dst);
-
 
 class PointSetTransModel : public RANSAC::Model<PointPair, Eigen::Matrix4f>
 {
@@ -22,87 +13,33 @@ public:
     unsigned int NumElementsRequired() override
     {
         return 3;
-    };
+    }
+
+    void SetModelParams(const Eigen::Matrix4f& params) override
+    {
+        m_trans = params;
+    }
 
     Eigen::Matrix4f Fit(
-        const std::vector<PointPair>& elements, 
+        const std::vector<PointPair>& elements,
         const std::vector<float>& weights) override
     {
         unsigned int N = elements.size();
 
-        if (weights.size() == 0) std::vector<float> weights(N, 1.0);
-        assert(weights.size() == N);
-
-        std::vector<Eigen::Vector3f> src;
-        std::vector<Eigen::Vector3f> dst;
-        src.reserve(N);
-        dst.reserve(N);
-
-        // compute centroids of point clouds
-        Eigen::Vector3f src_c = Eigen::Vector3f::Zero();
-        Eigen::Vector3f dst_c = Eigen::Vector3f::Zero();
-        float total_weight = 0.0;
+        Eigen::MatrixXf src(3, N);
+        Eigen::MatrixXf dst(3, N);
 
         for (int i = 0; i < N; i++)
         {
-            float weight = weights[i];
-            src_c += elements[i].first  * weight;
-            dst_c += elements[i].second * weight;
-            total_weight += weight;
+            src(0, i) = elements[i].first(0);
+            src(1, i) = elements[i].first(1);
+            src(2, i) = elements[i].first(2);
+            dst(0, i) = elements[i].second(0);
+            dst(1, i) = elements[i].second(1);
+            dst(2, i) = elements[i].second(2);
         }
 
-        src_c /= total_weight;
-        dst_c /= total_weight;
-
-        // demean of point clouds
-        for (int i = 0; i < N; i++)
-        {
-            src.emplace_back(elements[i].first  - src_c);
-            dst.emplace_back(elements[i].second - dst_c);
-        }
-
-        // compute cross covariance matrix
-        Eigen::Matrix3f M = Eigen::Matrix3f::Zero();
-
-        for (int i = 0; i < N; i++)
-        {
-            M(0, 0) += dst[i](0) * src[i](0) * weights[i];
-            M(0, 1) += dst[i](0) * src[i](1) * weights[i];
-            M(0, 2) += dst[i](0) * src[i](2) * weights[i];
-            M(1, 0) += dst[i](1) * src[i](0) * weights[i];
-            M(1, 1) += dst[i](1) * src[i](1) * weights[i];
-            M(1, 2) += dst[i](1) * src[i](2) * weights[i];
-            M(2, 0) += dst[i](2) * src[i](0) * weights[i];
-            M(2, 1) += dst[i](2) * src[i](1) * weights[i];
-            M(2, 2) += dst[i](2) * src[i](2) * weights[i];
-        }
-
-        // svd
-        Eigen::JacobiSVD<Eigen::MatrixXf> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
-        Eigen::Matrix U = svd.matrixU();
-        Eigen::Matrix V = svd.matrixV();
-
-        Eigen::Vector3f S = Eigen::Vector3f::Ones();
-        if (U.determinant() * V.determinant() < 0) S(2) = -1;
-
-        // compute transformation
-        m_rotation = U * S.asDiagonal() * V.transpose();
-        m_translation = dst_c - m_rotation * src_c;
-
-        m_trans = Eigen::Matrix4f::Identity();
-        m_trans(0, 0) = m_rotation(0, 0);
-        m_trans(0, 1) = m_rotation(0, 1);
-        m_trans(0, 2) = m_rotation(0, 2);
-        m_trans(1, 0) = m_rotation(1, 0);
-        m_trans(1, 1) = m_rotation(1, 1);
-        m_trans(1, 2) = m_rotation(1, 2);
-        m_trans(2, 0) = m_rotation(2, 0);
-        m_trans(2, 1) = m_rotation(2, 1);
-        m_trans(2, 2) = m_rotation(2, 2);
-        m_trans(0, 3) = m_translation(0);
-        m_trans(1, 3) = m_translation(1);
-        m_trans(2, 3) = m_translation(2);
-        
+        m_trans = Eigen::umeyama(src, dst, false);
         return m_trans;
     }
 
@@ -111,22 +48,29 @@ public:
         Eigen::Vector3f src = element.first;
         Eigen::Vector3f dst = element.second;
 
-        Eigen::Vector3f src_trans = m_rotation * src + m_translation;
-        Eigen::Vector3f diff = dst - src_trans;
+        Eigen::Vector4f src_h;
+        src_h(0) = src(0);
+        src_h(1) = src(1);
+        src_h(2) = src(2);
+        src_h(3) = 1.0;
+
+        Eigen::Vector4f src_trans = m_trans * src_h;
 
         float dist = 0.0;
-        dist += diff(0) * diff(0);
-        dist += diff(1) * diff(1);
-        dist += diff(2) * diff(2);
+        dist += (dst(0) - src_trans(0)) * (dst(0) - src_trans(0));
+        dist += (dst(1) - src_trans(1)) * (dst(1) - src_trans(1));
+        dist += (dst(2) - src_trans(2)) * (dst(2) - src_trans(2));
         dist = sqrt(dist);
-        loss = dist; // L2 distance
 
-        return (dist < 1.0);
+        if (dist < 1.0)
+        {
+            loss = 0;
+            return true;
+        }
+        loss = 0;
+        return false;
     }
 
 private:
-    // variables
     Eigen::Matrix4f m_trans;
-    Eigen::Matrix3f m_rotation;
-    Eigen::Vector3f m_translation;
 };

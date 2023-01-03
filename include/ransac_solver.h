@@ -8,6 +8,15 @@
 
 namespace RANSAC {
 
+// Option
+struct Option
+{
+    bool m_final_model_fitting = false;
+    bool m_early_termination = false;
+    float m_concensus_ratio = 0.8;
+};
+
+
 // Model
 template <class Element, class ModelParams>
 class Model
@@ -33,15 +42,10 @@ public:
     Solver(Model<Element, ModelParams>* model_, int max_iteration_)
         : m_model(model_), m_max_iteration(max_iteration_) {};
 
-    // ModelParams Solve(const std::vector<Element>& elements)
-    // {
-    //     unsigned int N = elements.size();
-    //     std::vector<float> weights(N, 1.0);
-    //     std::vector<bool> labels(N, true);
-    //     std::vector<float> losses(N, 0.0);
-
-    //     return this->Solve(elements, weights, labels, losses);
-    // }
+    void SetOptions(const Option& options)
+    {
+        m_options = options;
+    }
 
     ModelParams Solve(
         const std::vector<Element>& elements,
@@ -53,6 +57,8 @@ public:
         losses.clear();
 
         unsigned int size = elements.size();
+        unsigned int concensus_count_threshold = ceil(size * m_options.m_concensus_ratio);
+
         labels.reserve(size);
         losses.reserve(size);
 
@@ -116,8 +122,8 @@ public:
             }
 
             // early termination when concensus found
-            // TODO::make this as an option
-            // if (count > size * 0.8) break;
+            if (m_options.m_early_termination &&
+                count > concensus_count_threshold) break;
         }
 
         // compute final params with inliers
@@ -132,16 +138,18 @@ public:
             }
         }
 
-        // // final fitting
-        // ModelParams params_final;
-        // if (inliers.size() > num)
-        // {
-        //     params_final = m_model->Fit(inliers, inlier_weights);
-        // }
-        // else // failed to reject outliers
-        // {
-        //     params_final = m_model->Fit(elements, weights);
-        // }
+        // final fitting
+        if (m_options.m_final_model_fitting)
+        {
+            if (inliers.size() > num)
+            {
+                params_final = m_model->Fit(inliers, inlier_weights);
+            }
+            else // failed to reject outliers; fit with all elements
+            {
+                params_final = m_model->Fit(elements, weights);
+            }
+        }
 
         // update inlier info and losses
         m_model->SetModelParams(params_final);
@@ -159,6 +167,8 @@ public:
 private:
     int                             m_max_iteration;
     Model<Element, ModelParams>*    m_model;
+
+    Option                          m_options;
 };
 
 } // RANSAC

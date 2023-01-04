@@ -2,6 +2,7 @@
 
 #include "stdlib.h"
 
+#include <math.h>
 #include <vector>
 #include <iostream>
 
@@ -11,9 +12,10 @@ namespace RANSAC {
 // Option
 struct Option
 {
-    bool m_final_model_fitting = false;
-    bool m_early_termination = false;
-    float m_concensus_ratio = 0.8;
+    unsigned int max_iterations = 100;
+    bool final_model_fitting = false;
+    bool early_termination = false;
+    float concensus_ratio = 0.8;
 };
 
 
@@ -39,8 +41,7 @@ template <class Element, class ModelParams>
 class Solver
 {
 public:
-    Solver(Model<Element, ModelParams>* model_, int max_iteration_)
-        : m_model(model_), m_max_iteration(max_iteration_) {};
+    Solver(Model<Element, ModelParams>* model): m_model(model) {};
 
     void SetOptions(const Option& options)
     {
@@ -57,7 +58,7 @@ public:
         losses.clear();
 
         unsigned int size = elements.size();
-        unsigned int concensus_count_threshold = ceil(size * m_options.m_concensus_ratio);
+        unsigned int concensus_count_threshold = ceil(size * m_options.concensus_ratio);
 
         labels.reserve(size);
         losses.reserve(size);
@@ -75,7 +76,7 @@ public:
         std::vector<bool> is_inlier_final;
         is_inlier_final.resize(size);
 
-        for (int i  = 0; i < m_max_iteration; i++)
+        for (int i = 0; i < m_options.max_iterations; i++)
         {
             elements_selected.clear();
             weights_selected.clear();
@@ -122,7 +123,7 @@ public:
             }
 
             // early termination when concensus found
-            if (m_options.m_early_termination &&
+            if (m_options.early_termination &&
                 count > concensus_count_threshold) break;
         }
 
@@ -139,7 +140,7 @@ public:
         }
 
         // final fitting
-        if (m_options.m_final_model_fitting)
+        if (m_options.final_model_fitting)
         {
             if (inliers.size() > num)
             {
@@ -165,9 +166,7 @@ public:
     };
 
 private:
-    int                             m_max_iteration;
     Model<Element, ModelParams>*    m_model;
-
     Option                          m_options;
 };
 

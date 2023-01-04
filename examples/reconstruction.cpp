@@ -103,7 +103,7 @@ cv::Mat CalcEssentialMatrix(std::vector<cv::Point2f> kp_1, std::vector<cv::Point
 
     // compute essential matrix
     EssentialMatrix model;
-    RANSAC::Solver<PointPair, cv::Mat> solver(&model, 10);
+    RANSAC::Solver<PointPair, cv::Mat> solver(&model);
     cv::Mat E_hat = solver.Solve(point_pairs);
     cv::Mat E = N2.t() * E_hat * N1;
 
